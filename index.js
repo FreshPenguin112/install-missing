@@ -24,7 +24,7 @@ class InstallMissingPlugin {
   installMissingPackages(callback) {
     fs.stat(this.packageJson, (err) => {
       if (err) fs.writeFileSync(this.packageJson, '{}');
-      dependencyCheck({ path: process.cwd(), entries: '', noDefaultEntries: true }, (err, installed) => {
+      dependencyCheck({ path: '/home/runner/work/penguinmod.github.io/penguinmod.github.io', entries: '', noDefaultEntries: true }, (err, installed) => {
         if (err) {
           this.log.error(err);
           return callback();
