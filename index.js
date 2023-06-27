@@ -1,8 +1,9 @@
 const childProcess = require('child_process');
+const path = require('path');
 
 class InstallMissingPlugin {
   apply(compiler) {
-    compiler.hooks.afterEmit.tap('InstallMissingPlugin', (compilation) => {
+    compiler.hooks.afterEmit.tap('InstallMissingPackagesPlugin', (compilation) => {
       const { chunks } = compilation.getStats().toJson();
 
       // Extract all imported or required modules from chunks
@@ -36,9 +37,11 @@ class InstallMissingPlugin {
         const command = `pnpm add ${missingPackages.join(' ')}`;
 
         try {
+          const cwd = path.resolve('/home/runner/work/penguinmod.github.io/penguinmod.github.io');
           childProcess.execSync(command, {
             encoding: 'utf-8',
             stdio: 'inherit',
+            cwd, // Set the current working directory
           });
         } catch (error) {
           console.error(`Failed to install missing packages: ${missingPackages.join(', ')}`);
