@@ -1,54 +1,50 @@
-const fs = require('fs');
-const path = require('path');
-const dependencyCheck = require('dependency-check');
-const { spawnSync } = require('child_process');
-const debug = require('debug');
+const childProcess = require('child_process');
 
 class InstallMissingPlugin {
-  constructor() {
-    this.packageJson = path.join('/home/runner/work/penguinmod.github.io/penguinmod.github.io', 'package.json');
-    this.log = {
-      info: debug('install-missing:info'),
-      error: debug('install-missing:error'),
-    };
-    this.log.info.log = console.log.bind(console);
-    this.log.error.log = console.error.bind(console);
-  }
-
   apply(compiler) {
-    compiler.hooks.beforeRun.tapAsync('InstallMissingPlugin', (compiler, callback) => {
-      this.installMissingPackages(callback);
-    });
-  }
+    compiler.hooks.afterEmit.tap('InstallMissingPlugin', (compilation) => {
+      const { chunks } = compilation.getStats().toJson();
 
-  installMissingPackages(callback) {
-    fs.stat(this.packageJson, (err) => {
-      if (err) fs.writeFileSync(this.packageJson, '{}');
-      dependencyCheck({ path: '/home/runner/work/penguinmod.github.io/penguinmod.github.io', entries: '', noDefaultEntries: true }, (err, installed) => {
-        if (err) {
-          this.log.error(err);
-          return callback();
+      // Extract all imported or required modules from chunks
+      const modules = chunks.reduce((acc, chunk) => {
+        return [
+          ...acc,
+          ...chunk.modules.reduce((moduleAcc, module) => {
+            const { rawRequest } = module;
+
+            if (rawRequest && !moduleAcc.includes(rawRequest)) {
+              return [...moduleAcc, rawRequest];
+            }
+
+            return moduleAcc;
+          }, []),
+        ];
+      }, []);
+
+      // Filter out packages already listed in package.json
+      const missingPackages = modules.filter((module) => {
+        try {
+          require.resolve(module);
+          return false;
+        } catch (error) {
+          return true;
         }
-
-        const missingPackages = dependencyCheck.missing(installed.package, installed.used);
-        if (missingPackages.length === 0) {
-          this.log.info('All modules are installed');
-          return callback();
-        }
-
-        const pnpmArgs = ['-s', 'add', ...missingPackages];
-        const pnpmOptions = {
-          cwd: process.cwd(),
-          stdio: 'inherit',
-        };
-
-        this.log.info('Installing missing modules:', missingPackages);
-        const proc = spawnSync('pnpm', pnpmArgs, pnpmOptions);
-        const error = proc.status !== 0 ? `pnpm install failed with code ${proc.status}` : null;
-        if (error) this.log.error(error);
-        else this.log.info('Installed and saved to package.json as dependencies');
-        callback();
       });
+
+      // Install missing packages using pnpm
+      if (missingPackages.length > 0) {
+        const command = `pnpm add ${missingPackages.join(' ')}`;
+
+        try {
+          childProcess.execSync(command, {
+            encoding: 'utf-8',
+            stdio: 'inherit',
+          });
+        } catch (error) {
+          console.error(`Failed to install missing packages: ${missingPackages.join(', ')}`);
+          console.error(error);
+        }
+      }
     });
   }
 }
