@@ -6,7 +6,7 @@ const debug = require('debug');
 
 class InstallMissingPlugin {
   constructor() {
-    this.packageJson = path.join('~', 'package.json');
+    this.packageJson = path.join('/', 'package.json');
     this.log = {
       info: debug('install-missing:info'),
       error: debug('install-missing:error'),
